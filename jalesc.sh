@@ -6,7 +6,7 @@ C_GREEN='\033[1;32m'
 C_YELLOW='\033[1;33m'
 C_BLUE='\033[1;34m'
 C_WHITE='\033[1;37m'
-C_RESET_SED='\033[0m'
+C_RESET_SED='\\033[0m'
 C_RED_SED='\\033[1;31m'
 C_GREEN_SED='\\033[1;32m'
 C_YELLOW_SED='\\033[1;33m'
@@ -41,10 +41,15 @@ echo -e "${C_WHITE}INTERFACE IP ADDRESSES${C_RESET}"
 echo "----------------------------"
 if [ -n "$(which ifconfig 2>/dev/null)" ]; then
     ifout=$(ifconfig)
-    inetaddrs=$(echo "$ifout" | grep -o "inet addr:[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}")
+    if [ $(echo "$ifout" | grep -c "inet addr:") -gt 0 ]; then
+    	inetaddrs=$(echo "$ifout" | grep -o "inet addr:[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}")
+    else
+    	inetaddrs=$(echo "$ifout" | grep -o "inet [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}")
+    fi
+		
 else
     ifout=$(ip addr show)
-    inetaddrs=$(echo "$ifout" | grep -o "inet[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}")
+    inetaddrs=$(echo "$ifout" | grep -o "inet [0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}")
 fi
 
 while read -r addr; do
@@ -93,7 +98,7 @@ note_highlight "users with an interactive shell"
 echo "----------------------------"
 echo -e "${C_WHITE}RECENT USER SESSIONS${C_RESET}"
 echo "----------------------------"
-if [ -n "$(which last 2>/dev/null" ] && [ -f "/var/log/wtmp" ]; then
+if [ -n "$(which last 2>/dev/null)" ] && [ -f "/var/log/wtmp" ]; then
     last -n 10 | grep -v "wtmp begins"
 else
     print_err "The \'last\' utility is not available on this system. Skipping . . ."
@@ -155,10 +160,14 @@ echo "----------------------------"
 echo -e "${C_WHITE}SET UID BINARIES${C_RESET}"
 echo "----------------------------"
 echo ""
-defaultSetUIDs="/usr/bin/at /usr/bin/Xorg /usr/bin/crontab /usr/bin/chfn /usr/bin/sudo /usr/bin/gpasswd \
-                /usr/bin/passwd /usr/bin/pkexec /bin/ping /bin/su /bin/umount /bin/fusermount /bin/ping6 \
-                /bin/mount /sbin/mount.nfs"
-suids=$(find / -type f -perm -4000 -exec ls -la {} \; 2>/dev/null)
+defaultSetUIDs="/usr/bin/at /usr/bin/Xorg /usr/bin/crontab /usr/bin/chfn /usr/bin/sudo /usr/bin/gpasswd"
+defaultSetUIDs="${defaultSetUIDs} /usr/bin/passwd /usr/bin/pkexec /bin/ping /bin/su /bin/umount"
+defaultSetUIDs="${defaultSetUIDs} /bin/fusermount /bin/ping6 /bin/mount /sbin/mount /usr/bin/newgrp"
+defaultSetUIDs="${defaultSetUIDs} /usr/lib/xorg/Xorg.wrap /usr/bin/traceroute6.iputils /usr/sbin/pppd"
+defaultSetUIDs="${defaultSetUIDs} /usr/bin/arping /usr/bin/chsh"
+
+print_notif "This could take a few moments . . ."
+suids=$(find / -type f -perm -4000 -exec ls -la {} \; 2>/dev/null | grep -v /snap)
 suidsFilenames=$(echo "$suids" | rev | cut -d " " -f 1 | rev)
 while read -r suid; do
     if [ $(echo "$defaultSetUIDs" | grep -c "$suid") -eq 0 ]; then
