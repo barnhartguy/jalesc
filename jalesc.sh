@@ -121,34 +121,46 @@ if [ "$logFile" == "NOPERMS" ]; then
     echo ""
 else
     sshhist=$(grep -m 15 "Accepted" $logFile)
-    users=$(echo "$sshhist" | grep -o "for .* from" | cut -d " " -f 2 | sort | uniq)
-    while read -r user; do
-        sshhist=$(echo "$sshhist" | sed "s/${user}/${C_BLUE_SED}${user}${C_RESET_SED}/g")
-    done <<< "$users"
-    echo -e "$sshhist"
-    note_highlight "accounts trying to authenticate"
+	if [ -z "$sshhist" ]; then
+		print_notif "No presence of any SSH authentication history . . . "
+    	echo ""
+	else 
+    	users=$(echo "$sshhist" | grep -o "for .* from" | cut -d " " -f 2 | sort | uniq)
+    	while read -r user; do
+        	sshhist=$(echo "$sshhist" | sed "s/${user}/${C_BLUE_SED}${user}${C_RESET_SED}/g")
+    	done <<< "$users"
+    	echo -e "$sshhist"
+    	note_highlight "accounts trying to authenticate"
+	fi
 fi
 
 echo "----------------------------"
 echo -e "${C_WHITE}HOME DIRECTORIES${C_RESET}"
 echo "----------------------------"
 echo ""
-homedirs=$(ls -lah /home/)
-readables=$(find /home/ -maxdepth 1 -type d -readable | tail -n +2)
-echo -e "${C_WHITE}/home${C_RESET}"
-while read -r dir; do
-    dir=$(echo "$dir" | cut -d "/" -f 3)
-    homedirs=$(echo "$homedirs" | sed -e "s/${dir}/${C_BLUE_SED}${dir}${C_RESET_SED}/g")
-done <<< "$readables"
-echo -e "$homedirs"
-echo ""
+homedirs=$(ls /home/)
+if [ -z "$homedirs" ]; then
+	print_notif "The /home directory appears to be empty . . ."
+	echo ""
+else
+	homedirs=$(ls -lh /home/)
+	readables=$(find /home/ -maxdepth 1 -type d -readable | tail -n +2)
+	echo -e "${C_WHITE}/home${C_RESET}"
+	while read -r dir; do
+    	dir=$(echo "$dir" | cut -d "/" -f 3)
+    	homedirs=$(echo "$homedirs" | sed -e "s/${dir}/${C_BLUE_SED}${dir}${C_RESET_SED}/g")
+	done <<< "$readables"
+	echo -e "$homedirs"
+	echo ""
 
-while read -r dir; do
-    echo -e "${C_WHITE}${dir}${C_RESET}"
-    ls -lah $dir
-    echo ""
-done <<< "$readables"
-note_highlight "accessible home directories"
+	while read -r dir; do
+    	echo -e "${C_WHITE}${dir}${C_RESET}"
+    	ls -lah $dir
+    	echo ""
+	done <<< "$readables"
+	note_highlight "accessible home directories"
+fi
+
 
 
 echo "#################################################"
@@ -164,8 +176,9 @@ defaultSetUIDs="/usr/bin/at /usr/bin/Xorg /usr/bin/crontab /usr/bin/chfn /usr/bi
 defaultSetUIDs="${defaultSetUIDs} /usr/bin/passwd /usr/bin/pkexec /bin/ping /bin/su /bin/umount"
 defaultSetUIDs="${defaultSetUIDs} /bin/fusermount /bin/ping6 /bin/mount /sbin/mount /usr/bin/newgrp"
 defaultSetUIDs="${defaultSetUIDs} /usr/lib/xorg/Xorg.wrap /usr/bin/traceroute6.iputils /usr/sbin/pppd"
-defaultSetUIDs="${defaultSetUIDs} /usr/bin/arping /usr/bin/chsh"
-
+defaultSetUIDs="${defaultSetUIDs} /usr/bin/arping /usr/bin/chsh /usr/bin/ntfs-3g /usr/sbin/exim4 /usr/bin/umount"
+defaultSetUIDs="${defaultSetUIDs} /usr/lib/openssh/ssh-keysign /usr/bin/fusermount /usr/sbin/exim4 /usr/sbin/mount.cifs"
+defaultSetUIDs="${defaultSetUIDs} /usr/bin/mount /usr/lib/dbus-1.0/dbus-daemon-launch-helper /usr/bin/bwrap"
 print_notif "This could take a few moments . . ."
 suids=$(find / -type f -perm -4000 -exec ls -la {} \; 2>/dev/null | grep -v /snap)
 suidsFilenames=$(echo "$suids" | rev | cut -d " " -f 1 | rev)
