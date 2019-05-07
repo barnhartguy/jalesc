@@ -15,14 +15,17 @@ C_WHITE_SED='\\033[1;37m'
 
 function print_err {
     echo -e "${C_RED}[-]${C_RESET} $1"
+	echo ""
 }
 
 function print_notif {
     echo -e "${C_YELLOW}[!]${C_RESET} $1"
+	echo ""
 }
 
 function print_success {
     echo -e "${C_GREEN}[+]${C_RESET} $1"
+	echo ""
 }
 
 function note_highlight {
@@ -39,6 +42,7 @@ echo ""
 echo "----------------------------"
 echo -e "${C_WHITE}INTERFACE IP ADDRESSES${C_RESET}"
 echo "----------------------------"
+echo ""
 if [ -n "$(which ifconfig 2>/dev/null)" ]; then
     ifout=$(ifconfig)
     if [ $(echo "$ifout" | grep -c "inet addr:") -gt 0 ]; then
@@ -61,21 +65,36 @@ note_highlight "ipv4 addresses"
 echo "----------------------------"
 echo -e "${C_WHITE}ARP CACHE${C_RESET}"
 echo "----------------------------"
+echo ""
 cat /proc/net/arp
 echo ""
 
 echo "----------------------------"
 echo -e "${C_WHITE}LISTENING SOCKETS${C_RESET}"
 echo "----------------------------"
+echo ""
 netstat -auntp 2>/dev/null | egrep "(Proto|LISTEN|udp)"
 echo ""
 
 echo "----------------------------"
 echo -e "${C_WHITE}ESTABLISHED CONNECTIONS${C_RESET}"
 echo "----------------------------"
+echo ""
 netstat -auntp 2>/dev/null | egrep -v "(LISTEN|udp)"
 echo ""
 
+echo "----------------------------"
+echo -e "${C_WHITE}DNS AND HOSTNAMES${C_RESET}"
+echo "----------------------------"
+echo ""
+echo -e "${C_WHITE}Our Hostname:${C_RESET} $(hostname)"
+echo ""
+echo -e "${C_WHITE}Configured name servers:${C_RESET}"
+echo "$(grep "nameserver" /etc/resolv.conf 2>/dev/null)"
+echo ""
+echo -e "${C_WHITE}Mappings configured in /etc/hosts:${C_RESET}"
+echo "$(egrep -v "#" /etc/hosts 2>/dev/null | sed '/^$/d')"
+echo ""
 
 
 echo "#################################################"
@@ -180,7 +199,7 @@ defaultSetUIDs="${defaultSetUIDs} /usr/bin/arping /usr/bin/chsh /usr/bin/ntfs-3g
 defaultSetUIDs="${defaultSetUIDs} /usr/lib/openssh/ssh-keysign /usr/bin/fusermount /usr/sbin/exim4 /usr/sbin/mount.cifs"
 defaultSetUIDs="${defaultSetUIDs} /usr/bin/mount /usr/lib/dbus-1.0/dbus-daemon-launch-helper /usr/bin/bwrap"
 print_notif "This could take a few moments . . ."
-suids=$(find / -type f -perm -4000 -exec ls -la {} \; 2>/dev/null | grep -v /snap)
+suids=$(find / -type f -perm -4000 -not -path "/sys/*" -not -path "/run/*" -not -path "/proc/*" -not -path "/dev/*" -exec ls -la {} \; 2>/dev/null | grep -v /snap)
 suidsFilenames=$(echo "$suids" | rev | cut -d " " -f 1 | rev)
 while read -r suid; do
     if [ $(echo "$defaultSetUIDs" | grep -c "$suid") -eq 0 ]; then
@@ -190,3 +209,190 @@ while read -r suid; do
 done <<< "$suidsFilenames"
 echo -e "$suids"
 note_highlight "\"non-standard\" SUID binaries"
+
+echo "----------------------------"
+echo -e "${C_WHITE}NOTABLE SYSTEM FILES${C_RESET}"
+echo "----------------------------"
+echo ""
+echo -e "${C_WHITE}Potential config files${C_RESET}"
+out=$(find / -type f -not -path "/var/*" -not -path "/proc/*" -not -path "/sys/*" -not -path "/run/*" -name "*.cfg" -o -name "*.conf" -o -name "*.cnf" -exec ls -lh {} \; 2>/dev/null)
+fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+while read -r file; do
+
+	if [ -r "$file" ]; then
+        file=$(echo "$file" | sed "s/\//\\\\\//g")
+		out=$(echo "$out" | sed -e "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+	fi
+done <<< "$fnames"
+echo -e "$out"
+echo ""
+
+echo -e "${C_WHITE}/var/log Log Files${C_RESET}"
+out=$(find /var/log -type f -exec ls -lh {} \;)
+fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+
+while read -r file; do
+	
+	if [ -r "$file" ]; then
+        file=$(echo "$file" | sed "s/\//\\\\\//g")
+		out=$(echo "$out" | sed "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+	fi
+done <<< "$fnames"
+echo -e "$out"
+echo ""
+
+echo -e "${C_WHITE}/var/www Web Files${C_RESET}"
+out=$(find /var/www -type f -exec ls -lh {} \;)
+fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+while read -r file; do
+	
+	if [ -r "$file" ]; then
+        file=$(echo "$file" | sed "s/\//\\\\\//g")
+		out=$(echo "$out" | sed "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+	fi
+done <<< "$fnames"
+echo -e "$out"
+note_highlight "file is readable"
+
+echo "----------------------------"
+echo -e "${C_WHITE}FILES WITH CAPABILITIES${C_RESET}"
+echo "----------------------------"
+echo ""
+out=$(getcap -r / 2>/dev/null)
+if [ -z "$out" ]; then
+	print_notif "No capabilities set on any files . . ."
+else
+	echo "$out"
+	echo ""
+fi
+	
+
+echo "----------------------------"
+echo -e "${C_WHITE}USER PRESENCE FILES${C_RESET}"
+echo "----------------------------"
+echo ""
+echo -e "${C_WHITE}Bash History Files${C_RESET}"
+out=$(find / -type f -not -path "/proc/*" -not -path "/run/*" -not -path "/dev/*" -not -path "/sys/*" -name ".bash_history" -exec ls -lh {} \; 2>/dev/null)
+if [ -z "$out" ]; then
+	print_notif "No bash history files could be located . . ."
+else
+	fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+	while read -r file; do
+	
+		if [ -r "$file" ]; then
+			fileraw=$file
+       	    file=$(echo "$file" | sed "s/\//\\\\\//g")
+			out=$(echo "$out" | sed "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+			out="$out\n$(print_notif 'Last 20 Commands...')\n"
+			out="${out}$(tail -n 20 ${fileraw})"
+		fi
+	
+	done <<< "$fnames"
+	echo -e "$out"
+	echo ""
+fi
+
+echo -e "${C_WHITE}MYSQL History Files${C_RESET}"
+out=$(find / -type f -not -path "/proc/*" -not -path "/run/*" -not -path "/dev/*" -not -path "/sys/*" -name ".mysql_history" -exec ls -lh {} \; 2>/dev/null)
+if [ -z "$out" ]; then
+	print_notif "No mysql history files could be located . . ."
+else
+	fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+	while read -r file; do
+	
+		if [ -r "$file" ]; then
+			fileraw=$file
+       	    file=$(echo "$file" | sed "s/\//\\\\\//g")
+			out=$(echo "$out" | sed "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+			out="$out\n$(print_notif 'Last 20 Commands...')\n"
+			out="${out}$(tail -n 20 ${fileraw})"
+		fi
+	
+	done <<< "$fnames"
+	echo -e "$out"
+	echo ""
+fi
+
+echo -e "${C_WHITE}viminfo Files${C_RESET}"
+out=$(find / -type f -not -path "/proc/*" -not -path "/run/*" -not -path "/dev/*" -not -path "/sys/*" -name ".viminfo" -exec ls -lh {} \; 2>/dev/null)
+if [ -z "$out" ]; then
+	print_notif "No viminfo files could be located . . ."
+else
+	fnames=$(echo "$out" | rev | cut -d " " -f 1 | rev)
+	while read -r file; do	
+		if [ -r "$file" ]; then
+       	    file=$(echo "$file" | sed "s/\//\\\\\//g")
+			out=$(echo "$out" | sed "s/${file}/${C_BLUE_SED}${file}${C_RESET_SED}/g")
+		fi
+	
+	done <<< "$fnames"
+	echo -e "$out"
+	echo ""
+fi
+note_highlight "file is readable"
+
+echo "#################################################"
+echo "#           SECTION: Processes and Jobs          #"
+echo "#################################################"
+echo ""
+
+echo "----------------------------"
+echo -e "${C_WHITE}RUNNING PROCESSES${C_RESET}"
+echo "----------------------------"
+echo ""
+ps -elf | egrep -v "*]$"
+echo ""
+
+echo "----------------------------"
+echo -e "${C_WHITE}CRON DIRECTORIES${C_RESET}"
+echo "----------------------------"
+echo ""
+echo -e "${C_WHITE}/etc/cron.d${C_RESET}"
+out=$(ls -lh /etc/cron.d | egrep -v "^total")
+if [ -z "$out" ]; then
+	print_notif "No jobs configured in cron.d . . ."
+else
+	echo "$out"
+	echo ""
+fi
+echo -e "${C_WHITE}/etc/cron.hourly${C_RESET}"
+out=$(ls -lh /etc/cron.hourly | egrep -v "^total")
+if [ -z "$out" ]; then
+	print_notif "No jobs configured in cron.hourly . . ."
+else
+	echo "$out"
+	echo ""
+fi
+echo -e "${C_WHITE}/etc/cron.daily${C_RESET}"
+out=$(ls -lh /etc/cron.daily | egrep -v "^total")
+if [ -z "$out" ]; then
+	print_notif "No jobs configured in cron.daily . . ."
+else
+	echo "$out"
+	echo ""
+fi
+echo -e "${C_WHITE}/etc/cron.monthly${C_RESET}"
+out=$(ls -lh /etc/cron.monthly | egrep -v "^total")
+if [ -z "$out" ]; then
+	print_notif "No jobs configured in cron.monthly . . ."
+else
+	echo "$out"
+	echo ""
+fi
+
+echo -e "${C_WHITE}System Crontab Content${C_RESET}"
+if [ -r "/etc/crontab" ]; then
+	cat /etc/crontab | egrep -v "^#"
+	echo ""
+else
+	print_notif "/etc/crontab is not readable by the current user . . ."
+fi
+
+echo -e "${C_WHITE}User Crontabs${C_RESET}"
+out=$(ls -lh /var/spool/cron/crontabs | egrep -v "^total")
+if [ -z "$out" ]; then
+	print_notif "No User crontabs could be found . . ."
+else
+	echo "$out"
+	echo ""
+fi
