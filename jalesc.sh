@@ -1,4 +1,5 @@
 #!/bin/bash
+#Created by: @kindredsec
 
 C_RESET='\033[0m'
 C_RED='\033[1;31m'
